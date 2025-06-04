@@ -1,3 +1,5 @@
+import os
+import json
 import jwt
 import getpass
 import argparse
@@ -38,9 +40,31 @@ class Pytune:
         uid = None
 
         if certpfx:
-            if refresh_token is None:
-                password = self.get_password(password)
-            prt, session_key = deviceauth(username, password, refresh_token, certpfx, proxy)
+            prt_file_candidates = [
+                "roadtx.prt",
+                os.path.join(os.path.expanduser("~"), ".roadtools", "roadtx.prt"),
+            ]
+            for roadtx_file in prt_file_candidates:
+                if not os.path.exists(roadtx_file):
+                    continue
+                try:
+                    with open(roadtx_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    prt = data.get("refresh_token")
+                    session_key = data.get("session_key")
+                    if prt and session_key:
+                        self.logger.info(
+                            f"Using existing PRT and session key from {roadtx_file}"
+                        )
+                        break
+                except Exception as e:
+                    self.logger.warning(f"Failed to load {roadtx_file}: {e}")
+
+            if prt is None or session_key is None:
+                if refresh_token is None:
+                    password = self.get_password(password)
+                prt, session_key = deviceauth(username, password, refresh_token, certpfx, proxy)
+
             access_token, refresh_token = prtauth(prt, session_key, '29d9ed98-a469-4536-ade2-f981bc1d605e', 'https://enrollment.manage.microsoft.com/', 'ms-appx-web://Microsoft.AAD.BrokerPlugin/DRS', proxy)
             claims = jwt.decode(access_token, options={"verify_signature":False}, algorithms=['RS256'])
             tenant = claims['upn'].split('@')[1]
