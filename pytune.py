@@ -8,10 +8,10 @@ from device.device import Device
 from device.android import Android
 from device.windows import Windows
 from device.linux import Linux
-from utils.utils import deviceauth, prtauth
+from utils.utils import deviceauth, prtauth, create_pfx
 from utils.logger import Logger
 
-version = '1.1'
+version = '1.2'
 banner = r'''
  ______   __  __     ______   __  __     __   __     ______    
 /\  == \ /\ \_\ \   /\__  _\ /\ \/\ \   /\ "-.\ \   /\  ___\   
@@ -123,6 +123,11 @@ class Pytune:
         device = self.new_device('Windows', device_name, None, None, None, None, proxy)
         device.download_remediation_scripts(mdmpfx)
 
+    def pem2pfx(self, certpem, keypem, pfxpath):
+        create_pfx(certpem, keypem, pfxpath)
+        self.logger.success(f"successfully created {pfxpath}")
+        self.logger.info("password is 'password'")
+
 def main():
     description = f"{banner}"
     parser = argparse.ArgumentParser(add_help=True, description=color(description, fore='deepskyblue'), formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -180,6 +185,11 @@ def main():
     download_apps_intune_parser.add_argument('-m', '--mdmpfx', required=True, action='store', help='mdm pfx path')
     download_apps_intune_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
 
+    pem2pfx_parser = subparsers.add_parser('pem2pfx', help='convert pem and key to pfx')
+    pem2pfx_parser.add_argument('-c', '--certpem', required=True, action='store', help='certificate pem file')
+    pem2pfx_parser.add_argument('-k', '--keypem', required=True, action='store', help='private key file')
+    pem2pfx_parser.add_argument('-o', '--output', required=True, action='store', help='output pfx path')
+
     args = parser.parse_args()
     proxy = None
     if args.proxy:
@@ -207,6 +217,8 @@ def main():
         pytune.download_apps(args.device_name, args.mdmpfx, proxy)
     if args.command == 'get_remediations':
         pytune.download_remediation_scripts(args.device_name, args.mdmpfx, proxy)
+    if args.command == 'pem2pfx':
+        pytune.pem2pfx(args.certpem, args.keypem, args.output)
 
 if __name__ == "__main__":
     main()
