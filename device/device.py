@@ -230,6 +230,8 @@ class Device:
         response = requests.get(
             url=msi_url,
             cert=(certpath, keypath),
+            proxies=self.proxy,
+            verify=False,
         )
 
         if response.status_code == 200 and file_name_hash:
