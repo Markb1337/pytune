@@ -42,7 +42,9 @@ def get_tenantid(domain):
     return token_endpoint.split('/')[3]
 
 
-def get_devicetoken(tenant, certpfx):
+def get_devicetoken(tenant, certpfx, logger=None):
+    if logger:
+        logger.info(f"requesting device token for tenant '{tenant}'")
     nonce = get_nonce()
     tid = get_tenantid(tenant)
 
@@ -86,13 +88,20 @@ def get_devicetoken(tenant, certpfx):
     return res.json()['access_token']
 
 
-def gettokens(username, password, clientid, resource):
+def gettokens(username, password, clientid, resource, logger=None):
+    if logger:
+        logger.info(
+            f"performing username/password auth for '{username}' using client_id='{clientid}' and resource='{resource}'"
+        )
     auth = Authentication(username, password, None, clientid)
     auth.resource_uri = resource
     return auth.authenticate_username_password()
 
 
-def deviceauth(username, password, refresh_token, certpfx, proxy):
+def deviceauth(username, password, refresh_token, certpfx, proxy, logger=None):
+    if logger:
+        method = "password" if password else "refresh token"
+        logger.info(f"performing DEVICEAUTH for user '{username}' using {method}")
     device_auth = DeviceAuthentication()
     device_auth.proxies = proxy
     device_auth.verify = False
@@ -137,7 +146,12 @@ def prtauth(prt, session_key, client_id, resource, redirect_uri, proxy, logger):
     return res['access_token'], res['refresh_token']
 
 
-def renew_token(refresh_token, client_id, scope, proxy):
+def renew_token(refresh_token, client_id, scope, proxy, logger=None):
+    if logger:
+        client_name = get_client_name_by_guid(client_id)
+        logger.info(
+            f"renewing token using client_id='{client_id}' ({client_name}) with scope='{scope}'"
+        )
     data = {
         'client_id': client_id,
         'grant_type': 'refresh_token',
@@ -155,7 +169,9 @@ def renew_token(refresh_token, client_id, scope, proxy):
     return json['access_token']
 
 
-def token_renewal_for_enrollment(url, access_token, proxy):
+def token_renewal_for_enrollment(url, access_token, proxy, logger=None):
+    if logger:
+        logger.info(f"retrieving enrollment token from '{url}'")
     headers = {'Authorization': 'Bearer {}'.format(access_token)}
 
     response = requests.get(

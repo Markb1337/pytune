@@ -64,7 +64,9 @@ class Pytune:
             if prt is None or session_key is None:
                 if refresh_token is None:
                     password = self.get_password(password)
-                prt, session_key = deviceauth(username, password, refresh_token, certpfx, proxy)
+                prt, session_key = deviceauth(
+                    username, password, refresh_token, certpfx, proxy, self.logger
+                )
 
             access_token, refresh_token = prtauth(prt, session_key, '29d9ed98-a469-4536-ade2-f981bc1d605e', 'https://enrollment.manage.microsoft.com/', 'ms-appx-web://Microsoft.AAD.BrokerPlugin/DRS', proxy, self.logger)
             claims = jwt.decode(access_token, options={"verify_signature": False}, algorithms=['RS256'])

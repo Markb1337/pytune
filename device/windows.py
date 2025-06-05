@@ -559,7 +559,7 @@ class IME():
     def request_policy(self):
         sidecar_url = self.resolve_service_address()
         if sidecar_url is None:
-            self.logger.error('SidecCarGatewayService not found')
+            self.logger.error('SideCarGatewayService not found')
             return []
 
         sessionid = str(uuid.uuid4())
