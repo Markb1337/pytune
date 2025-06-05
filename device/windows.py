@@ -125,6 +125,10 @@ class Windows(Device):
             proxies=self.proxy,
             verify=False
         )
+
+        if response.status_code != 200:
+            self.logger.error(f'Error in Intune enrollment: {response.status_code}')
+            self.logger.error(f'The following content was returned: \n{response.content}')
         xml = ET.fromstring(response.content.decode('utf-8'))
         binary_security_token = xml.find('.//{http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd}BinarySecurityToken').text
         return base64.b64decode(binary_security_token).decode('utf-8')
