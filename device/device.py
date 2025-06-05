@@ -55,6 +55,9 @@ class Device:
             auth.resource_uri = devicereg
             auth.proxies = self.proxy
             auth.verify = False
+            self.logger.info(
+                f"performing username/password auth for '{username}' to resource '{devicereg}'"
+            )
             access_token = auth.authenticate_username_password()['accessToken']
 
         certpath = f'{self.device_name}_cert.pem'
@@ -303,8 +306,16 @@ class Device:
         self.logger.info(f"resolved IWservice url: {iwservice_url}")
         token_renewal_url = self.get_enrollment_info(access_token, 'TokenRenewalService')
         self.logger.info(f"resolved token renewal url: {token_renewal_url}")
-        renewal_token = renew_token(refresh_token, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'd4ebce55-015a-49b5-a083-c84d1797ae8c/.default openid offline_access profile', self.proxy)
-        enrollment_token = token_renewal_for_enrollment(token_renewal_url, renewal_token, self.proxy)
+        renewal_token = renew_token(
+            refresh_token,
+            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
+            'd4ebce55-015a-49b5-a083-c84d1797ae8c/.default openid offline_access profile',
+            self.proxy,
+            self.logger,
+        )
+        enrollment_token = token_renewal_for_enrollment(
+            token_renewal_url, renewal_token, self.proxy, self.logger
+        )
 
         device_name = self.get_device_info(iwservice_url, enrollment_token, 'OfficialName')
         state = self.get_device_info(iwservice_url, enrollment_token, 'ComplianceState')
@@ -337,8 +348,16 @@ class Device:
         token_renewal_url = self.get_enrollment_info(access_token, 'TokenRenewalService')
         self.logger.info(f"resolved token renewal url: {token_renewal_url}")
 
-        renewal_token = renew_token(refresh_token, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'd4ebce55-015a-49b5-a083-c84d1797ae8c/.default openid offline_access profile', self.proxy)
-        enrollment_token = token_renewal_for_enrollment(token_renewal_url, renewal_token, self.proxy)
+        renewal_token = renew_token(
+            refresh_token,
+            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
+            'd4ebce55-015a-49b5-a083-c84d1797ae8c/.default openid offline_access profile',
+            self.proxy,
+            self.logger,
+        )
+        enrollment_token = token_renewal_for_enrollment(
+            token_renewal_url, renewal_token, self.proxy, self.logger
+        )
 
         retire_info = self.get_device_info(iwservice_url, enrollment_token, '#CommonContainer.Retire')
         if retire_info == None:
@@ -349,7 +368,7 @@ class Device:
             return
 
         retire_url = retire_info['target']
-        self.logger.info(f"resolved reitrement url: {retire_url}")
+        self.logger.info(f"resolved retirement url: {retire_url}")
 
         result = self.send_retire_request(retire_url, enrollment_token)
         if result == True:
