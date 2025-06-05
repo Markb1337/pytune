@@ -28,7 +28,7 @@ class Windows(Device):
     
     def get_enrollment_token(self, refresh_token):
         access_token, refresh_token = prtauth(
-            self.prt, self.session_key, '29d9ed98-a469-4536-ade2-f981bc1d605e', 'https://enrollment.manage.microsoft.com/', 'ms-aadj-redir://auth/mdm', self.proxy
+            self.prt, self.session_key, '29d9ed98-a469-4536-ade2-f981bc1d605e', 'https://enrollment.manage.microsoft.com/', 'ms-aadj-redir://auth/mdm', self.proxy, self.logger
             )
         return access_token
 

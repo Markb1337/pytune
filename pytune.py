@@ -20,19 +20,20 @@ banner = r'''
   \/_/     \/_____/     \/_/   \/_____/   \/_/ \/_/   \/_____/ 
                                                                
 ''' + \
-f'      Faking a device to Microsft Intune (version:{version})'
+    f'      Faking a device to Microsft Intune (version:{version})'
+
 
 class Pytune:
     def __init__(self, logger):
         self.logger = logger
         return
-       
+
     def get_password(self, password):
         if password is None:
             password = getpass.getpass("Enter your password: ")
         return password
 
-    def new_device(self, os, device_name, username, password, refresh_token, certpfx, proxy):
+    def new_device(self, operatingsystem, device_name, username, password, refresh_token, certpfx, proxy):
         prt = None
         session_key = None
         tenant = None
@@ -65,22 +66,22 @@ class Pytune:
                     password = self.get_password(password)
                 prt, session_key = deviceauth(username, password, refresh_token, certpfx, proxy)
 
-            access_token, refresh_token = prtauth(prt, session_key, '29d9ed98-a469-4536-ade2-f981bc1d605e', 'https://enrollment.manage.microsoft.com/', 'ms-appx-web://Microsoft.AAD.BrokerPlugin/DRS', proxy)
-            claims = jwt.decode(access_token, options={"verify_signature":False}, algorithms=['RS256'])
+            access_token, refresh_token = prtauth(prt, session_key, '29d9ed98-a469-4536-ade2-f981bc1d605e', 'https://enrollment.manage.microsoft.com/', 'ms-appx-web://Microsoft.AAD.BrokerPlugin/DRS', proxy, self.logger)
+            claims = jwt.decode(access_token, options={"verify_signature": False}, algorithms=['RS256'])
             tenant = claims['upn'].split('@')[1]
             deviceid = claims['deviceid']
             uid = claims['oid']
 
-        if os == 'Android':
-            device = Android(self.logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy)
-        elif os == 'Windows':
-            device = Windows(self.logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy)
-        elif os == 'Linux':
-            device = Linux(self.logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy)
+        if operatingsystem == 'Android':
+            device = Android(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
+        elif operatingsystem == 'Windows':
+            device = Windows(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
+        elif operatingsystem == 'Linux':
+            device = Linux(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
         return device
 
-    def entra_join(self, username, password, access_token, device_name, os, deviceticket, proxy):
-        device = self.new_device(os, device_name, None, None, None, None, proxy)
+    def entra_join(self, username, password, access_token, device_name, operatingsystem, deviceticket, proxy):
+        device = self.new_device(operatingsystem, device_name, None, None, None, None, proxy)
         if access_token is None:
             password = self.get_password(password)
 
@@ -92,23 +93,23 @@ class Pytune:
         device.entra_delete(certpfx)
         return
 
-    def enroll_intune(self, os, device_name, username, password, refresh_token, certpfx, proxy):
-        device = self.new_device(os, device_name, username, password, refresh_token, certpfx, proxy)
+    def enroll_intune(self, operatingsystem, device_name, username, password, refresh_token, certpfx, proxy):
+        device = self.new_device(operatingsystem, device_name, username, password, refresh_token, certpfx, proxy)
         device.enroll_intune()
 
-    def checkin(self, os, device_name, username, password, refresh_token, certpfx, mdmpfx, hwhash, proxy):
-        device = self.new_device(os, device_name, username, password, refresh_token, certpfx, proxy)
+    def checkin(self, operatingsystem, device_name, username, password, refresh_token, certpfx, mdmpfx, hwhash, proxy):
+        device = self.new_device(operatingsystem, device_name, username, password, refresh_token, certpfx, proxy)
         device.hwhash = hwhash
         device.checkin(mdmpfx)
         return
 
-    def retire_intune(self, os, username, password, refresh_token, certpfx, proxy):
-        device = self.new_device(os, None, username, password, refresh_token, certpfx, proxy)
+    def retire_intune(self, operatingsystem, username, password, refresh_token, certpfx, proxy):
+        device = self.new_device(operatingsystem, None, username, password, refresh_token, certpfx, proxy)
         device.retire_intune()
         return
 
-    def check_compliant(self, os, username, password, refresh_token, certpfx, proxy):
-        device = self.new_device(os, None, username, password, refresh_token, certpfx, proxy)
+    def check_compliant(self, operatingsystem, username, password, refresh_token, certpfx, proxy):
+        device = self.new_device(operatingsystem, None, username, password, refresh_token, certpfx, proxy)
         device.check_compliant()
         return
 
@@ -116,12 +117,13 @@ class Pytune:
         device = self.new_device('Windows', device_name, None, None, None, None, proxy)
         device.download_apps(mdmpfx)
 
+
 def main():
     description = f"{banner}"
     parser = argparse.ArgumentParser(add_help=True, description=color(description, fore='deepskyblue'), formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-x', '--proxy', action='store', help='proxy to be used during authentication (format: http://proxyip:port)')
     subparsers = parser.add_subparsers(dest='command', description='pytune commands')
-    
+
     entra_join_parser = subparsers.add_parser('entra_join', help='join device to Entra ID')
     entra_join_parser.add_argument('-u', '--username', action='store', help='username')
     entra_join_parser.add_argument('-p', '--password', action='store', help='password')
@@ -129,7 +131,7 @@ def main():
     entra_join_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
     entra_join_parser.add_argument('-o', '--os', required=True, action='store', help='os')
     entra_join_parser.add_argument('-D', '--deviceticket', required=False, action='store', help='device ticket')
-    
+
     entra_delete_parser = subparsers.add_parser('entra_delete', help='delete device from Entra ID')
     entra_delete_parser.add_argument('-c', '--certpfx', required=True, action='store', help='device cert pfx path')
 
@@ -170,13 +172,13 @@ def main():
     download_apps_intune_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
 
     args = parser.parse_args()
-    proxy=None
+    proxy = None
     if args.proxy:
-        proxy={
-            'https':args.proxy,
-            'http':args.proxy
-            }
-        
+        proxy = {
+            'https': args.proxy,
+            'http': args.proxy
+        }
+
     logger = Logger()
     pytune = Pytune(logger)
 
@@ -191,10 +193,10 @@ def main():
     if args.command == 'retire_intune':
         pytune.retire_intune(args.os, args.username, args.password, args.refresh_token, args.certpfx, proxy)
     if args.command == 'check_compliant':
-        pytune.check_compliant(args.os, args.username, args.password, args.refresh_token, args.certpfx, proxy)                
+        pytune.check_compliant(args.os, args.username, args.password, args.refresh_token, args.certpfx, proxy)
     if args.command == 'download_apps':
-        pytune.download_apps(args.device_name, args.mdmpfx, proxy)        
+        pytune.download_apps(args.device_name, args.mdmpfx, proxy)
+
 
 if __name__ == "__main__":
     main()
-
