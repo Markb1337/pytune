@@ -12,6 +12,8 @@ Supported OSs are as follows:
 - Windows
 - Android
 - Linux
+- macOS
+- iOS
 
 This tools gives red teamers following advantages;
 

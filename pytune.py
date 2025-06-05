@@ -8,6 +8,8 @@ from device.device import Device
 from device.android import Android
 from device.windows import Windows
 from device.linux import Linux
+from device.macos import MacOS
+from device.ios import IOS
 from utils.utils import deviceauth, prtauth
 from utils.logger import Logger
 
@@ -80,6 +82,10 @@ class Pytune:
             device = Windows(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
         elif operatingsystem == 'Linux':
             device = Linux(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
+        elif operatingsystem == 'macOS':
+            device = MacOS(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
+        elif operatingsystem == 'iOS':
+            device = IOS(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
         return device
 
     def entra_join(self, username, password, access_token, device_name, operatingsystem, deviceticket, proxy):
