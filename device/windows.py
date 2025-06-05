@@ -603,8 +603,18 @@ class IME():
         )
 
         decrypted_data = aes_decrypt(key, iv, response.content[48:])
-        with open(f'{appname}.intunewin', 'wb') as f:
-            f.write(decrypted_data)        
+        intunewin_path = f'{appname}.intunewin'
+        with open(intunewin_path, 'wb') as f:
+            f.write(decrypted_data)
+
+        try:
+            import zipfile
+            extract_dir = f'{appname}_extracted'
+            with zipfile.ZipFile(intunewin_path, 'r') as zf:
+                zf.extractall(extract_dir)
+            self.logger.success(f'extracted to {extract_dir}')
+        except Exception as e:
+            self.logger.error(f'failed to extract {intunewin_path}: {e}')
 
     def request_policy(self):
         sidecar_url = self.resolve_service_address()
