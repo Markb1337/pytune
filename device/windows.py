@@ -554,9 +554,9 @@ class IME():
 
     def request_policy(self):
         sidecar_url = self.resolve_service_address()
-        if sidecar_url == None:
-            self.logger.error(f'SidecCarGatewayService not found')
-            return
+        if sidecar_url is None:
+            self.logger.error('SidecCarGatewayService not found')
+            return []
 
         sessionid = str(uuid.uuid4())
         data = self.create_request_data(sessionid, "PolicyRequest")

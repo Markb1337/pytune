@@ -106,7 +106,14 @@ class Linux(Device):
         return
 
     def checkin(self, mdmpfx):
-        access_token, refresh_token = prtauth(self.prt, self.session_key, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'https://graph.microsoft.com/', None)        
+        access_token, refresh_token = prtauth(
+            self.prt,
+            self.session_key,
+            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
+            'https://graph.microsoft.com/',
+            None,
+            self.proxy
+        )
         self.checkin_url = self.get_enrollment_info(access_token, 'LinuxDeviceCheckinService')        
         self.logger.info(f"resolved checkin url: {self.checkin_url}")
 
