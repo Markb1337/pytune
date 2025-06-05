@@ -26,7 +26,7 @@ This tools gives red teamers following advantages;
 
 ```
 python3 pytune.py -h
-usage: pytune.py [-h] {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps} ...
+usage: pytune.py [-h] {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,pem2pfx} ...
 
 
  ______   __  __     ______   __  __     __   __     ______    
@@ -44,7 +44,7 @@ options:
 subcommands:
   pytune commands
 
-  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps}
+  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,pem2pfx}
     entra_join          join device to Entra ID
     entra_delete        delete device from Entra ID
     enroll_intune       enroll device to Intune
@@ -52,6 +52,7 @@ subcommands:
     retire_intune       retire device from Intune
     check_compliant     check compliant status
     download_apps       download available win32apps and scripts (only Windows supported since I'm lazy)
+    pem2pfx             convert PEM files to PFX for use with other commands
 ```
 
 ### Enroll a fake device
@@ -186,7 +187,7 @@ If there are Win32 apps or PowerShell scripts to be delviered, you can donwload 
 Here is the example of the command.
 
 ```
-$ python3 pytune.py download_apps -d Windows_pytune -m Windows_pytune_mdm.pfx                                                                            
+$ python3 pytune.py download_apps -d Windows_pytune -m Windows_pytune_mdm.pfx
 [*] downloading scripts...
 [!] scripts found!
 [*] #1 (policyid:f7e2c3b6-b57f-43fb-a17f-2feab218806b):
@@ -209,7 +210,19 @@ Add-LocalGroupMember -Group "Administrators" -Member $userName
 
 When successful, PowerShell scripts are displayed and also .intunewin files are downloaded.
 
-.intunewin file is just a zip file and you can unzip it to extract the Win32 apps inside. 
+.intunewin file is just a zip file and you can unzip it to extract the Win32 apps inside.
+
+### Convert PEM and key to PFX
+
+If you used roadtx to register a device, it outputs separate certificate and key files. Convert them to a password protected PFX with `pem2pfx`.
+
+```
+$ python3 pytune.py pem2pfx -c device_cert.pem -k device_key.pem -o device.pfx
+[+] successfully created device.pfx
+[*] password is 'password'
+```
+
+.intunewin file is just a zip file and you can unzip it to extract the Win32 apps inside.
 
 ### Clean-up
 
