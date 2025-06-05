@@ -63,6 +63,8 @@ class Linux(Device):
             url=f'{self.checkin_url}/details?api-version=1.0',
             json=data,
             headers={'Authorization': f'Bearer {access_token}'},
+            proxies=self.proxy,
+            verify=False,
         )
 
         if 'deviceFriendlyName' not in response.json():
@@ -73,6 +75,8 @@ class Linux(Device):
         response = requests.get(
             url=f'{self.checkin_url}/policies/{self.intune_deviceid}?api-version=1.0',
             headers={'Authorization': 'Bearer {}'.format(access_token)},
+            proxies=self.proxy,
+            verify=False,
         )
 
         return response.json()['policies']
@@ -109,6 +113,8 @@ class Linux(Device):
             url=f'{self.checkin_url}/status?api-version=1.0',
             json=data,
             headers={'Authorization': 'Bearer {}'.format(access_token)},
+            proxies=self.proxy,
+            verify=False,
         )
         return
 

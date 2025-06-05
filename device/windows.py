@@ -479,6 +479,8 @@ class IME():
         response = requests.get(
             url='https://manage.microsoft.com/RestUserAuthLocationService/RestUserAuthLocationService/Certificate/ServiceAddresses',
             cert=(self.certpath, self.keypath),
+            verify=False,
+            proxies=self.proxy,
             )
         
         services = response.json()[0]["Services"]
@@ -525,6 +527,8 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
+            verify=False,
+            proxies=self.proxy,
             )
         
         response_payload = response.json()['ResponsePayload']
@@ -547,6 +551,8 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
+            verify=False,
+            proxies=self.proxy,
             )
         
         response_payload = response.json()['ResponsePayload']
@@ -592,14 +598,18 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
-            )    
+            verify=False,
+            proxies=self.proxy,
+            )
 
         response_payload = response.json()["ResponsePayload"]
         return json.loads(response_payload)
 
     def download_decrypt_intunewin(self, appname, upload_location, key, iv):
         response = requests.get(
-            url=upload_location
+            url=upload_location,
+            verify=False,
+            proxies=self.proxy,
         )
 
         decrypted_data = aes_decrypt(key, iv, response.content[48:])
@@ -624,6 +634,8 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
-            )    
+            verify=False,
+            proxies=self.proxy,
+            )
         response_payload = response.json()["ResponsePayload"]
         return json.loads(response_payload)

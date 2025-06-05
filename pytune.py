@@ -176,9 +176,9 @@ def main():
     download_apps_intune_parser.add_argument('-m', '--mdmpfx', required=True, action='store', help='mdm pfx path')
     download_apps_intune_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
 
-    download_apps_intune_parser = subparsers.add_parser('get_remediations', help='download available remediation scripts (only Windows supported since I\'m lazy)')
-    download_apps_intune_parser.add_argument('-m', '--mdmpfx', required=True, action='store', help='mdm pfx path')
-    download_apps_intune_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
+    download_remediations_intune_parser = subparsers.add_parser('get_remediations', help='download available remediation scripts (only Windows supported since I\'m lazy)')
+    download_remediations_intune_parser.add_argument('-m', '--mdmpfx', required=True, action='store', help='mdm pfx path')
+    download_remediations_intune_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
 
     args = parser.parse_args()
     proxy = None

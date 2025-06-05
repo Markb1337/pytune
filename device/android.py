@@ -352,10 +352,6 @@ class Android(Device):
                 "Format": "chr",
                 "Data": self.deviceid
             },
-            f"./User/{self.uid}/Vendor/MSFT/Scheduler/intervalDurationSeconds": {
-                "Format": "int",
-                "Data": "28800"
-            },
             f"./Device/Vendor/MSFT/DeviceLock/DevicePolicyManager/IsActivePasswordSufficient": {
                 "Format": "bool",
                 "Data": "true"
