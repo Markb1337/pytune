@@ -10,10 +10,10 @@ from device.windows import Windows
 from device.linux import Linux
 from device.macos import MacOS
 from device.ios import IOS
-from utils.utils import deviceauth, prtauth
+from utils.utils import deviceauth, prtauth, create_pfx
 from utils.logger import Logger
 
-version = '1.1'
+version = '1.2'
 banner = r'''
  ______   __  __     ______   __  __     __   __     ______    
 /\  == \ /\ \_\ \   /\__  _\ /\ \/\ \   /\ "-.\ \   /\  ___\   
@@ -129,6 +129,11 @@ class Pytune:
         device = self.new_device('Windows', device_name, None, None, None, None, proxy)
         device.download_remediation_scripts(mdmpfx)
 
+    def pem2pfx(self, certpem, keypem, pfxpath):
+        create_pfx(certpem, keypem, pfxpath)
+        self.logger.success(f"successfully created {pfxpath}")
+        self.logger.info("password is 'password'")
+
     def list_policies(self, operatingsystem, username, password, refresh_token, certpfx, proxy):
         device = self.new_device(operatingsystem, None, username, password, refresh_token, certpfx, proxy)
         device.list_policies()
@@ -136,6 +141,7 @@ class Pytune:
     def list_groups(self, operatingsystem, username, password, refresh_token, certpfx, proxy):
         device = self.new_device(operatingsystem, None, username, password, refresh_token, certpfx, proxy)
         device.list_device_groups()
+
 
 def main():
     description = f"{banner}"
@@ -208,6 +214,11 @@ def main():
     list_groups_parser.add_argument('-c', '--certpfx', required=True, action='store', help='device cert pfx path')
     list_groups_parser.add_argument('-o', '--os', required=True, action='store', help='os')
 
+    pem2pfx_parser = subparsers.add_parser('pem2pfx', help='convert pem and key to pfx')
+    pem2pfx_parser.add_argument('-c', '--certpem', required=True, action='store', help='certificate pem file')
+    pem2pfx_parser.add_argument('-k', '--keypem', required=True, action='store', help='private key file')
+    pem2pfx_parser.add_argument('-o', '--output', required=True, action='store', help='output pfx path')
+
     args = parser.parse_args()
     proxy = None
     if args.proxy:
@@ -235,6 +246,8 @@ def main():
         pytune.download_apps(args.device_name, args.mdmpfx, proxy)
     if args.command == 'get_remediations':
         pytune.download_remediation_scripts(args.device_name, args.mdmpfx, proxy)
+    if args.command == 'pem2pfx':
+        pytune.pem2pfx(args.certpem, args.keypem, args.output)
     if args.command == 'list_policies':
         pytune.list_policies(args.os, args.username, args.password, args.refresh_token, args.certpfx, proxy)
     if args.command == 'list_groups':

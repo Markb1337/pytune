@@ -28,7 +28,7 @@ This tools gives red teamers following advantages;
 
 ```
 python3 pytune.py -h
-usage: pytune.py [-h] {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations,list_policies,list_groups} ...
+usage: pytune.py [-h] {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations,list_policies,list_groups,pem2pfx}
 
 
  ______   __  __     ______   __  __     __   __     ______    
@@ -46,7 +46,8 @@ options:
 subcommands:
   pytune commands
 
-  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations,list_policies,list_groups}
+  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations,list_policies,list_groups,pem2pfx}
+
     entra_join          join device to Entra ID
     entra_delete        delete device from Entra ID
     enroll_intune       enroll device to Intune
@@ -57,6 +58,7 @@ subcommands:
     get_remediations    download available remediation scripts (only Windows supported since I'm lazy)
     list_policies       enumerate Intune policies
     list_groups         enumerate device groups
+    pem2pfx             convert PEM files to PFX for use with other commands
 ```
 
 ### Enroll a fake device
@@ -191,7 +193,7 @@ If there are Win32 apps or PowerShell scripts to be delviered, you can donwload 
 Here is the example of the command.
 
 ```
-$ python3 pytune.py download_apps -d Windows_pytune -m Windows_pytune_mdm.pfx                                                                            
+$ python3 pytune.py download_apps -d Windows_pytune -m Windows_pytune_mdm.pfx
 [*] downloading scripts...
 [!] scripts found!
 [*] #1 (policyid:f7e2c3b6-b57f-43fb-a17f-2feab218806b):
@@ -222,6 +224,16 @@ Use `list_policies` to enumerate compliance and configuration policies and `list
 ```
 $ python3 pytune.py list_policies -o Windows -c Windows_pytune.pfx -u testuser@contoso.onmicrosoft.com -p ********
 $ python3 pytune.py list_groups -o Windows -c Windows_pytune.pfx -u testuser@contoso.onmicrosoft.com -p ********
+```
+
+### Convert PEM and key to PFX
+
+If you used roadtx to register a device, it outputs separate certificate and key files. Convert them to a password protected PFX with `pem2pfx`.
+
+```
+$ python3 pytune.py pem2pfx -c device_cert.pem -k device_key.pem -o device.pfx
+[+] successfully created device.pfx
+[*] password is 'password'
 ```
 
 ### Clean-up
