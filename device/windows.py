@@ -479,6 +479,8 @@ class IME():
         response = requests.get(
             url='https://manage.microsoft.com/RestUserAuthLocationService/RestUserAuthLocationService/Certificate/ServiceAddresses',
             cert=(self.certpath, self.keypath),
+            verify=False,
+            proxies=self.proxy,
             )
         
         services = response.json()[0]["Services"]
@@ -525,6 +527,8 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
+            verify=False,
+            proxies=self.proxy,
             )
         
         response_payload = response.json()['ResponsePayload']
@@ -547,6 +551,8 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
+            verify=False,
+            proxies=self.proxy,
             )
         
         response_payload = response.json()['ResponsePayload']
@@ -592,19 +598,33 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
-            )    
+            verify=False,
+            proxies=self.proxy,
+            )
 
         response_payload = response.json()["ResponsePayload"]
         return json.loads(response_payload)
 
     def download_decrypt_intunewin(self, appname, upload_location, key, iv):
         response = requests.get(
-            url=upload_location
+            url=upload_location,
+            verify=False,
+            proxies=self.proxy,
         )
 
         decrypted_data = aes_decrypt(key, iv, response.content[48:])
-        with open(f'{appname}.intunewin', 'wb') as f:
-            f.write(decrypted_data)        
+        intunewin_path = f'{appname}.intunewin'
+        with open(intunewin_path, 'wb') as f:
+            f.write(decrypted_data)
+
+        try:
+            import zipfile
+            extract_dir = f'{appname}_extracted'
+            with zipfile.ZipFile(intunewin_path, 'r') as zf:
+                zf.extractall(extract_dir)
+            self.logger.success(f'extracted to {extract_dir}')
+        except Exception as e:
+            self.logger.error(f'failed to extract {intunewin_path}: {e}')
 
     def request_policy(self):
         sidecar_url = self.resolve_service_address()
@@ -624,6 +644,8 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
-            )    
+            verify=False,
+            proxies=self.proxy,
+            )
         response_payload = response.json()["ResponsePayload"]
         return json.loads(response_payload)

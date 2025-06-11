@@ -6,13 +6,13 @@ from datetime import datetime, timedelta, timezone
 from device.device import Device
 from utils.utils import renew_token
 
-class Android(Device):
+class IOS(Device):
     def __init__(self, logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy):
         super().__init__(logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy)
-        self.os_version = '8.2.0'
+        self.os_version = '17.0'
         self.ssp_version = '5.0.6060.0'
-        self.checkin_url = 'https://a.manage.microsoft.com/devicegatewayproxy/AndroidHandler.ashx?Platform=AndroidForWork'
-        self.provider_name = 'AndroidEnrollment'
+        self.checkin_url = 'https://a.manage.microsoft.com/devicegatewayproxy/iOSHandler.ashx?Platform=iOS'
+        self.provider_name = 'IOSEnrollment'
         self.cname = 'ConfigMgrEnroll'
 
     def generate_initial_syncml(self, sessionid, imei):
@@ -89,7 +89,7 @@ class Android(Device):
                 <ac:AdditionalContext
                     xmlns="http://schemas.xmlsoap.org/ws/2006/12/authorization">
                     <ac:ContextItem Name="DeviceType">
-                        <ac:Value>AndroidForWork</ac:Value>
+                        <ac:Value>iOS</ac:Value>
                     </ac:ContextItem>
                     <ac:ContextItem Name="ApplicationVersion">
                         <ac:Value>{self.os_version}</ac:Value>
@@ -104,7 +104,7 @@ class Android(Device):
                         <ac:Value>PYTUNE</ac:Value>
                     </ac:ContextItem>
                     <ac:ContextItem Name="Manufacturer">
-                        <ac:Value>Google</ac:Value>
+                        <ac:Value>Apple</ac:Value>
                     </ac:ContextItem>
                 </ac:AdditionalContext>
             </wst:RequestSecurityToken>
@@ -134,7 +134,7 @@ class Android(Device):
             },
             f"./DevInfo/Man": {
                 "Format": "chr",
-                "Data": "Google"
+                "Data": "Apple"
             },
             f"./DevDetail/SwV": {
                 "Format": "chr",
@@ -170,15 +170,15 @@ class Android(Device):
             },
             f"./Device/DevInfo/Man": {
                 "Format": "chr",
-                "Data": "Google"
+                "Data": "Apple"
             },
             f"./Device/DevInfo/Mod": {
                 "Format": "chr",
-                "Data": "Android SDK built for x86"
+                "Data": "iPhone"
             },
             f"./DevInfo/Mod": {
                 "Format": "chr",
-                "Data": "Android SDK built for x86"
+                "Data": "iPhone"
             },
             f"./Device/DevDetail/Ext/Microsoft/KnoxStandardCapable": {
                 "Format": "bool",
@@ -190,16 +190,16 @@ class Android(Device):
             },
             f"./Device/DevDetail/Ext/Microsoft/Container": {
                 "Format": "chr",
-                "Data": "AndroidForWork"
+                "Data": "iOS"
             },
             f"./Device/Vendor/MSFT/DeviceInformation/APILevel": {
                 "Format": "int",
                 "Data": "27"
             },
-            f"./Device/DevDetail/Ext/Microsoft/GoogleServicesAndroidId": {
+            f"./Device/DevDetail/Ext/Microsoft/DeviceIdentifier": {
                 "Format": "chr",
-                "Data": "371a184e7e106668"
-            },        
+                "Data": "000000000000000"
+            },
             f"./Device/DevDetail/Ext/Microsoft/IMEI": {
                 "Format": "chr",
                 "Data": "00000000000000"
@@ -228,7 +228,7 @@ class Android(Device):
                 "Format": "chr",
                 "Data": "en-US"
             },
-            f"./Device/Vendor/MSFT/GooglePlayServices/IsAvailable": {
+            f"./Device/Vendor/MSFT/AppleServices/IsAvailable": {
                 "Format": "bool",
                 "Data": "true"
             },
@@ -276,10 +276,10 @@ class Android(Device):
                 "Format": "chr",
                 "Data": "02:00:00:44:55:66"
             },
-            f"./Device/Vendor/MSFT/DeviceLock/DevicePolicyManager/IsAndroidSecurityLevelPatched": {
+            f"./Device/Vendor/MSFT/DeviceLock/DevicePolicyManager/IsiOSSecurityLevelPatched": {
                 "Format": "chr",
-                "Data": "2018-01-05"
-            },  
+                "Data": "2023-01-01"
+            },
             f"./Device/DevDetail/Ext/Microsoft/BuildNumber": {
                 "Format": "chr",
                 "Data": "OSM1.180201.007"
@@ -306,7 +306,7 @@ class Android(Device):
             },
             f"./Device/DevDetail/OEM": {
                 "Format": "chr",
-                "Data": "Google Android SDK built for x86"
+                "Data": "Apple iPhone"
             },
             f"./User/{self.uid}/Vendor/MSFT/DeviceLock/Provider/SCConfigMgr/MaxDevicePasswordFailedAttempts": {
                 "Format": "int",
@@ -351,6 +351,10 @@ class Android(Device):
             f"./Device/Vendor/MSFT/WorkplaceJoin/AADID": {
                 "Format": "chr",
                 "Data": self.deviceid
+            },
+            f"./User/{self.uid}/Vendor/MSFT/Scheduler/intervalDurationSeconds": {
+                "Format": "int",
+                "Data": "28800"
             },
             f"./Device/Vendor/MSFT/DeviceLock/DevicePolicyManager/IsActivePasswordSufficient": {
                 "Format": "bool",

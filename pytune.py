@@ -8,6 +8,8 @@ from device.device import Device
 from device.android import Android
 from device.windows import Windows
 from device.linux import Linux
+from device.macos import MacOS
+from device.ios import IOS
 from utils.utils import deviceauth, prtauth, create_pfx
 from utils.logger import Logger
 
@@ -80,6 +82,10 @@ class Pytune:
             device = Windows(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
         elif operatingsystem == 'Linux':
             device = Linux(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
+        elif operatingsystem == 'macOS':
+            device = MacOS(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
+        elif operatingsystem == 'iOS':
+            device = IOS(self.logger, operatingsystem, device_name, deviceid, uid, tenant, prt, session_key, proxy)
         return device
 
     def entra_join(self, username, password, access_token, device_name, operatingsystem, deviceticket, proxy):
@@ -127,6 +133,15 @@ class Pytune:
         create_pfx(certpem, keypem, pfxpath)
         self.logger.success(f"successfully created {pfxpath}")
         self.logger.info("password is 'password'")
+
+    def list_policies(self, operatingsystem, username, password, refresh_token, certpfx, proxy):
+        device = self.new_device(operatingsystem, None, username, password, refresh_token, certpfx, proxy)
+        device.list_policies()
+
+    def list_groups(self, operatingsystem, username, password, refresh_token, certpfx, proxy):
+        device = self.new_device(operatingsystem, None, username, password, refresh_token, certpfx, proxy)
+        device.list_device_groups()
+
 
 def main():
     description = f"{banner}"
@@ -181,9 +196,23 @@ def main():
     download_apps_intune_parser.add_argument('-m', '--mdmpfx', required=True, action='store', help='mdm pfx path')
     download_apps_intune_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
 
-    download_apps_intune_parser = subparsers.add_parser('get_remediations', help='download available remediation scripts (only Windows supported since I\'m lazy)')
-    download_apps_intune_parser.add_argument('-m', '--mdmpfx', required=True, action='store', help='mdm pfx path')
-    download_apps_intune_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
+    download_remediations_intune_parser = subparsers.add_parser('get_remediations', help='download available remediation scripts (only Windows supported since I\'m lazy)')
+    download_remediations_intune_parser.add_argument('-m', '--mdmpfx', required=True, action='store', help='mdm pfx path')
+    download_remediations_intune_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
+
+    list_policies_parser = subparsers.add_parser('list_policies', help='enumerate Intune policies')
+    list_policies_parser.add_argument('-u', '--username', action='store', help='username')
+    list_policies_parser.add_argument('-p', '--password', action='store', help='password')
+    list_policies_parser.add_argument('-r', '--refresh_token', action='store', help='refresh token for device registration service')
+    list_policies_parser.add_argument('-c', '--certpfx', required=True, action='store', help='device cert pfx path')
+    list_policies_parser.add_argument('-o', '--os', required=True, action='store', help='os')
+
+    list_groups_parser = subparsers.add_parser('list_groups', help='enumerate device groups')
+    list_groups_parser.add_argument('-u', '--username', action='store', help='username')
+    list_groups_parser.add_argument('-p', '--password', action='store', help='password')
+    list_groups_parser.add_argument('-r', '--refresh_token', action='store', help='refresh token for device registration service')
+    list_groups_parser.add_argument('-c', '--certpfx', required=True, action='store', help='device cert pfx path')
+    list_groups_parser.add_argument('-o', '--os', required=True, action='store', help='os')
 
     pem2pfx_parser = subparsers.add_parser('pem2pfx', help='convert pem and key to pfx')
     pem2pfx_parser.add_argument('-c', '--certpem', required=True, action='store', help='certificate pem file')
@@ -219,6 +248,10 @@ def main():
         pytune.download_remediation_scripts(args.device_name, args.mdmpfx, proxy)
     if args.command == 'pem2pfx':
         pytune.pem2pfx(args.certpem, args.keypem, args.output)
+    if args.command == 'list_policies':
+        pytune.list_policies(args.os, args.username, args.password, args.refresh_token, args.certpfx, proxy)
+    if args.command == 'list_groups':
+        pytune.list_groups(args.os, args.username, args.password, args.refresh_token, args.certpfx, proxy)
 
 if __name__ == "__main__":
     main()

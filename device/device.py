@@ -230,6 +230,8 @@ class Device:
         response = requests.get(
             url=msi_url,
             cert=(certpath, keypath),
+            proxies=self.proxy,
+            verify=False,
         )
 
         if response.status_code == 200 and file_name_hash:
@@ -338,6 +340,67 @@ class Device:
                 print(f' - ExpectedValue: {reason["ExpectedValue"]}')
             print(f' - Description: {reason["Description"]}')
             i = i + 1
+
+        return
+
+    def list_policies(self):
+        access_token, _ = prtauth(
+            self.prt,
+            self.session_key,
+            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
+            'https://graph.microsoft.com/',
+            None,
+            self.proxy,
+            self.logger,
+        )
+
+        endpoints = [
+            'deviceManagement/deviceCompliancePolicies',
+            'deviceManagement/deviceConfigurations'
+        ]
+
+        for endpoint in endpoints:
+            url = f'https://graph.microsoft.com/v1.0/{endpoint}'
+            response = requests.get(url, headers={'Authorization': f'Bearer {access_token}'}, proxies=self.proxy, verify=False)
+            if response.status_code != 200:
+                self.logger.error(f'failed to retrieve {endpoint}')
+                continue
+            items = response.json().get('value', [])
+            if len(items) == 0:
+                self.logger.info(f'no entries found for {endpoint}')
+                continue
+            self.logger.alert(f'{endpoint} :')
+            for item in items:
+                name = item.get('displayName') or item.get('name')
+                pid = item.get('id')
+                print(f' - {name} ({pid})')
+
+        return
+
+    def list_device_groups(self):
+        access_token, _ = prtauth(
+            self.prt,
+            self.session_key,
+            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
+            'https://graph.microsoft.com/',
+            None,
+            self.proxy,
+            self.logger,
+        )
+
+        url = 'https://graph.microsoft.com/v1.0/groups?$select=id,displayName,groupTypes'
+        response = requests.get(url, headers={'Authorization': f'Bearer {access_token}'}, proxies=self.proxy, verify=False)
+        if response.status_code != 200:
+            self.logger.error('failed to retrieve groups')
+            return
+
+        groups = response.json().get('value', [])
+        if len(groups) == 0:
+            self.logger.info('no groups found')
+            return
+        self.logger.alert('device groups:')
+        for grp in groups:
+            print(f" - {grp.get('displayName')} ({grp.get('id')}) {grp.get('groupTypes')}")
 
         return
 

@@ -3,18 +3,16 @@ import base64
 import requests
 from datetime import datetime
 from cryptography import x509
-from device.device import Device
+from device.linux import Linux
 from cryptography.hazmat.backends import default_backend
 from utils.utils import prtauth, renew_token, extract_pfx
 
 
-class Linux(Device):
+class MacOS(Linux):
     def __init__(self, logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy):
         super().__init__(logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy)
-        self.os_version = '22.04'
-        self.ssp_version = '1.2312.35'
-        self.checkin_url = None
-        self.provider_name = 'LinuxEnrollmentService'
+        self.os_version = '14.0'
+        self.provider_name = 'MacOSEnrollmentService'
         self.cname = self.device_name
 
     def get_enrollment_token(self, refresh_token):
@@ -54,8 +52,8 @@ class Linux(Device):
         data = {
             "DeviceId": self.intune_deviceid,
             "DeviceName": self.device_name,
-            "Manufacturer": "VMware, Inc.",
-            "OSDistribution": "Ubuntu",
+            "Manufacturer": "Apple",
+            "OSDistribution": "macOS",
             "OSVersion": self.os_version
         }
 
@@ -63,8 +61,6 @@ class Linux(Device):
             url=f'{self.checkin_url}/details?api-version=1.0',
             json=data,
             headers={'Authorization': f'Bearer {access_token}'},
-            proxies=self.proxy,
-            verify=False,
         )
 
         if 'deviceFriendlyName' not in response.json():
@@ -75,8 +71,6 @@ class Linux(Device):
         response = requests.get(
             url=f'{self.checkin_url}/policies/{self.intune_deviceid}?api-version=1.0',
             headers={'Authorization': 'Bearer {}'.format(access_token)},
-            proxies=self.proxy,
-            verify=False,
         )
 
         return response.json()['policies']
@@ -113,8 +107,6 @@ class Linux(Device):
             url=f'{self.checkin_url}/status?api-version=1.0',
             json=data,
             headers={'Authorization': 'Bearer {}'.format(access_token)},
-            proxies=self.proxy,
-            verify=False,
         )
         return
 
@@ -128,7 +120,7 @@ class Linux(Device):
             self.proxy,
             self.logger
         )
-        self.checkin_url = self.get_enrollment_info(access_token, 'LinuxDeviceCheckinService')
+        self.checkin_url = self.get_enrollment_info(access_token, 'MacOSDeviceCheckinService')
         self.logger.info(f"resolved checkin url: {self.checkin_url}")
 
         access_token = renew_token(

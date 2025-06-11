@@ -12,6 +12,8 @@ Supported OSs are as follows:
 - Windows
 - Android
 - Linux
+- macOS
+- iOS
 
 This tools gives red teamers following advantages;
 
@@ -26,7 +28,7 @@ This tools gives red teamers following advantages;
 
 ```
 python3 pytune.py -h
-usage: pytune.py [-h] {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,pem2pfx} ...
+usage: pytune.py [-h] {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations,list_policies,list_groups,pem2pfx}
 
 
  ______   __  __     ______   __  __     __   __     ______    
@@ -35,7 +37,7 @@ usage: pytune.py [-h] {entra_join,entra_delete,enroll_intune,checkin,retire_intu
  \ \_\    \/\_____\    \ \_\  \ \_____\  \ \_\\"\_\  \ \_____\ 
   \/_/     \/_____/     \/_/   \/_____/   \/_/ \/_/   \/_____/ 
                                                                
-      Faking a device to Microsft Intune (version:1.0)
+      Faking a device to Microsft Intune (version:1.1)
 
 
 options:
@@ -44,7 +46,8 @@ options:
 subcommands:
   pytune commands
 
-  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,pem2pfx}
+  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations,list_policies,list_groups,pem2pfx}
+
     entra_join          join device to Entra ID
     entra_delete        delete device from Entra ID
     enroll_intune       enroll device to Intune
@@ -52,6 +55,9 @@ subcommands:
     retire_intune       retire device from Intune
     check_compliant     check compliant status
     download_apps       download available win32apps and scripts (only Windows supported since I'm lazy)
+    get_remediations    download available remediation scripts (only Windows supported since I'm lazy)
+    list_policies       enumerate Intune policies
+    list_groups         enumerate device groups
     pem2pfx             convert PEM files to PFX for use with other commands
 ```
 
@@ -208,9 +214,17 @@ Add-LocalGroupMember -Group "Administrators" -Member $userName
 [+] successfully downloaded to DomainJoin.bat.intunewin!
 ```
 
-When successful, PowerShell scripts are displayed and also .intunewin files are downloaded.
+When successful, PowerShell scripts are displayed and `.intunewin` files are downloaded.
+Each package is automatically extracted to a folder named `<app>_extracted` so the wrapped installers can be examined immediately.
 
-.intunewin file is just a zip file and you can unzip it to extract the Win32 apps inside.
+### Enumerate Intune policies and device groups
+
+Use `list_policies` to enumerate compliance and configuration policies and `list_groups` to display Azure AD groups that can target devices.
+
+```
+$ python3 pytune.py list_policies -o Windows -c Windows_pytune.pfx -u testuser@contoso.onmicrosoft.com -p ********
+$ python3 pytune.py list_groups -o Windows -c Windows_pytune.pfx -u testuser@contoso.onmicrosoft.com -p ********
+```
 
 ### Convert PEM and key to PFX
 
@@ -221,8 +235,6 @@ $ python3 pytune.py pem2pfx -c device_cert.pem -k device_key.pem -o device.pfx
 [+] successfully created device.pfx
 [*] password is 'password'
 ```
-
-.intunewin file is just a zip file and you can unzip it to extract the Win32 apps inside.
 
 ### Clean-up
 
