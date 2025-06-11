@@ -123,6 +123,14 @@ class Pytune:
         device = self.new_device('Windows', device_name, None, None, None, None, proxy)
         device.download_remediation_scripts(mdmpfx)
 
+    def list_policies(self, operatingsystem, username, password, refresh_token, certpfx, proxy):
+        device = self.new_device(operatingsystem, None, username, password, refresh_token, certpfx, proxy)
+        device.list_policies()
+
+    def list_groups(self, operatingsystem, username, password, refresh_token, certpfx, proxy):
+        device = self.new_device(operatingsystem, None, username, password, refresh_token, certpfx, proxy)
+        device.list_device_groups()
+
 def main():
     description = f"{banner}"
     parser = argparse.ArgumentParser(add_help=True, description=color(description, fore='deepskyblue'), formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -180,6 +188,20 @@ def main():
     download_remediations_intune_parser.add_argument('-m', '--mdmpfx', required=True, action='store', help='mdm pfx path')
     download_remediations_intune_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
 
+    list_policies_parser = subparsers.add_parser('list_policies', help='enumerate Intune policies')
+    list_policies_parser.add_argument('-u', '--username', action='store', help='username')
+    list_policies_parser.add_argument('-p', '--password', action='store', help='password')
+    list_policies_parser.add_argument('-r', '--refresh_token', action='store', help='refresh token for device registration service')
+    list_policies_parser.add_argument('-c', '--certpfx', required=True, action='store', help='device cert pfx path')
+    list_policies_parser.add_argument('-o', '--os', required=True, action='store', help='os')
+
+    list_groups_parser = subparsers.add_parser('list_groups', help='enumerate device groups')
+    list_groups_parser.add_argument('-u', '--username', action='store', help='username')
+    list_groups_parser.add_argument('-p', '--password', action='store', help='password')
+    list_groups_parser.add_argument('-r', '--refresh_token', action='store', help='refresh token for device registration service')
+    list_groups_parser.add_argument('-c', '--certpfx', required=True, action='store', help='device cert pfx path')
+    list_groups_parser.add_argument('-o', '--os', required=True, action='store', help='os')
+
     args = parser.parse_args()
     proxy = None
     if args.proxy:
@@ -207,6 +229,10 @@ def main():
         pytune.download_apps(args.device_name, args.mdmpfx, proxy)
     if args.command == 'get_remediations':
         pytune.download_remediation_scripts(args.device_name, args.mdmpfx, proxy)
+    if args.command == 'list_policies':
+        pytune.list_policies(args.os, args.username, args.password, args.refresh_token, args.certpfx, proxy)
+    if args.command == 'list_groups':
+        pytune.list_groups(args.os, args.username, args.password, args.refresh_token, args.certpfx, proxy)
 
 if __name__ == "__main__":
     main()
