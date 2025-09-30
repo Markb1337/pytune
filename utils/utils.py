@@ -244,13 +244,10 @@ def prtauth(prt, session_key, client_id, resource, redirect_uri, proxy):
     # 3) If still MFA, instruct user and prompt for .roadtools_auth path
     if status == "mfa":
         print("\nMFA required for this flow. Do the following with roadtx:\n")
-        print("  1) roadtx prt")
+        print("  1) roadtx prt -u 'username' -p 'password' --cert-pfx your.pfx --pfx-pass password (or with -c en -k)")
         print("  2) roadtx prtenrich")
-        print("  3) roadtx prtauth")
-        print("     (use the same resource/client_id/redirect_uri as shown below)")
-        print("     resource: {}".format(resource))
-        print("     client_id: {}".format(client_id))
-        print("     redirect_uri: {}\n".format(redirect_uri))
+        print("  3) roadtx prt -r <prt you just got back> --cert-pfx your.pfx --pfx-pass password (or with -c en -k)")
+        print(f"  4) roadtx prtauth -c {client_id} -r '{resource}' -ru '{redirect_uri}'\n")
 
         tokens = _prompt_and_load_auth()
         return tokens  # may be None
