@@ -12,8 +12,6 @@ Supported OSs are as follows:
 - Windows
 - Android
 - Linux
-- macOS
-- iOS
 
 This tools gives red teamers following advantages;
 
@@ -27,9 +25,8 @@ This tools gives red teamers following advantages;
 ## Usage
 
 ```
-python3 pytune.py -h
-usage: pytune.py [-h] {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations,list_policies,list_groups,pem2pfx}
-
+$ python3 pytune.py -h
+usage: pytune.py [-h] [-x PROXY] [-v] {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations} ...
 
  ______   __  __     ______   __  __     __   __     ______    
 /\  == \ /\ \_\ \   /\__  _\ /\ \/\ \   /\ "-.\ \   /\  ___\   
@@ -37,7 +34,7 @@ usage: pytune.py [-h] {entra_join,entra_delete,enroll_intune,checkin,retire_intu
  \ \_\    \/\_____\    \ \_\  \ \_____\  \ \_\\"\_\  \ \_____\ 
   \/_/     \/_____/     \/_/   \/_____/   \/_/ \/_/   \/_____/ 
                                                                
-      Faking a device to Microsft Intune (version:1.1)
+      Faking a device to Microsft Intune (version:1.2)
 
 
 options:
@@ -46,8 +43,7 @@ options:
 subcommands:
   pytune commands
 
-  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations,list_policies,list_groups,pem2pfx}
-
+  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations}
     entra_join          join device to Entra ID
     entra_delete        delete device from Entra ID
     enroll_intune       enroll device to Intune
@@ -56,9 +52,6 @@ subcommands:
     check_compliant     check compliant status
     download_apps       download available win32apps and scripts (only Windows supported since I'm lazy)
     get_remediations    download available remediation scripts (only Windows supported since I'm lazy)
-    list_policies       enumerate Intune policies
-    list_groups         enumerate device groups
-    pem2pfx             convert PEM files to PFX for use with other commands
 ```
 
 ### Enroll a fake device
@@ -144,7 +137,7 @@ The device's compliance state is evaluated through the information sent to Intun
 `check_compliant` command queies the compliance state of the fake device and tell you which settings are not compliant with the company's policy
 
 ```
-$ python3 pytune.py check_compliant -o Windows -c Windows_pytune.pfx -u testuser@*******.onmicrosoft.com -p ***********                                    
+$ python3 pytune.py check_compliant -c Windows_pytune.pfx -u testuser@*******.onmicrosoft.com -p ***********                                    
 [*] resolved IWservice url: https://fef.msuc06.manage.microsoft.com/TrafficGateway/TrafficRoutingService/IWService/StatelessIWService
 [*] resolved token renewal url: https://fef.msuc06.manage.microsoft.com/OAuth/StatelessOAuthService/OAuthProxy/
 [-] Windows_pytune is not compliant
@@ -189,11 +182,12 @@ Then, after the initial check-in with the hardware hash, the next check-in will 
 
 ### Download Win32 apps and PowerShell scripts
 
-If there are Win32 apps or PowerShell scripts to be delviered, you can donwload it through `download_apps` command.
+If there are Win32 apps or PowerShell scripts to be delviered, you can donwload it through `download_apps` and `get_remediations` command.
+
 Here is the example of the command.
 
 ```
-$ python3 pytune.py download_apps -d Windows_pytune -m Windows_pytune_mdm.pfx
+$ python3 pytune.py download_apps -m Windows_pytune_mdm.pfx                                                                            
 [*] downloading scripts...
 [!] scripts found!
 [*] #1 (policyid:f7e2c3b6-b57f-43fb-a17f-2feab218806b):
@@ -214,27 +208,9 @@ Add-LocalGroupMember -Group "Administrators" -Member $userName
 [+] successfully downloaded to DomainJoin.bat.intunewin!
 ```
 
-When successful, PowerShell scripts are displayed and `.intunewin` files are downloaded.
-Each package is automatically extracted to a folder named `<app>_extracted` so the wrapped installers can be examined immediately.
+When successful, PowerShell scripts are displayed and also .intunewin files are downloaded.
 
-### Enumerate Intune policies and device groups
-
-Use `list_policies` to enumerate compliance and configuration policies and `list_groups` to display Azure AD groups that can target devices.
-
-```
-$ python3 pytune.py list_policies -o Windows -c Windows_pytune.pfx -u testuser@contoso.onmicrosoft.com -p ********
-$ python3 pytune.py list_groups -o Windows -c Windows_pytune.pfx -u testuser@contoso.onmicrosoft.com -p ********
-```
-
-### Convert PEM and key to PFX
-
-If you used roadtx to register a device, it outputs separate certificate and key files. Convert them to a password protected PFX with `pem2pfx`.
-
-```
-$ python3 pytune.py pem2pfx -c device_cert.pem -k device_key.pem -o device.pfx
-[+] successfully created device.pfx
-[*] password is 'password'
-```
+.intunewin file is just a zip file and you can unzip it to extract the Win32 apps inside. 
 
 ### Clean-up
 
@@ -270,3 +246,79 @@ Device was deleted in Azure AD
 
 If the device is enrolled as an AutoPilot device, then it fails to delete the device object from Entra ID.
 Delete the device information in Microsoft Intune admin center > Windows > Enrollment > Devices before `entra_delete` command.
+
+## Note
+
+### Enrollment restrictions
+
+There are some cases where you encounter several types of enrollment restrictions. When you run enroll_intune command with `-v` option, you can see the detailed error response from Intune for debugging purposes.
+
+Here are the examples of the error response.
+
+- failed to enroll Android device because the target tenant might not be connected to Google Play account to manage Android enterprise devices (there might be other cases where you meet this error response)
+
+```xml
+$ python3 pytune.py -v enroll_intune -o Android -f .roadtools_auth -c Android_pytune.pfx -d Android_pytune 
+[*] resolved enrollment url: https://fef.msuc06.manage.microsoft.com/StatelessEnrollmentService/DeviceEnrollment.svc
+[*] enrolling device to Intune...
+[*] received response for enrollment request:
+
+<s:Envelope
+	xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+	xmlns:a="http://www.w3.org/2005/08/addressing">
+	<s:Body>
+		<s:Fault>
+			<s:Code>
+				<s:Value>s:Receiver</s:Value>
+				<s:Subcode>
+					<s:Value>s:Authorization</s:Value>
+				</s:Subcode>
+			</s:Code>
+			<s:Reason>
+				<s:Text xml:lang="en-US">AFW Put User: Account not onboarded to Android Enterprise</s:Text>
+			</s:Reason>
+			<s:Detail>
+				<DeviceEnrollmentServiceError
+					xmlns="http://schemas.microsoft.com/windows/pki/2009/01/enrollment">
+					<ErrorType>Authorization</ErrorType>
+					<Message>AFW Put User: Account not onboarded to Android 
+Enterprise</Message>
+					<TraceId>192f66b8-c7eb-424f-8ead-175aa17c5250</TraceId>
+				</DeviceEnrollmentServiceError>
+			</s:Detail>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>
+```
+
+- Personally owned device restriction
+
+```xml
+<s:Envelope
+	xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+	xmlns:a="http://www.w3.org/2005/08/addressing">
+	<s:Body>
+		<s:Fault>
+			<s:Code>
+				<s:Value>s:Receiver</s:Value>
+				<s:Subcode>
+					<s:Value>s:Authorization</s:Value>
+				</s:Subcode>
+			</s:Code>
+			<s:Reason>
+				<s:Text xml:lang="en-US">Device 
+Identifier not preregistered</s:Text>
+			</s:Reason>
+			<s:Detail>
+				<DeviceEnrollmentServiceError
+					xmlns="http://schemas.microsoft.com/windows/pki/2009/01/enrollment">
+					<ErrorType>DeviceNotSupported</ErrorType>
+					<Message>Device Identifier not 
+preregistered</Message>
+					<TraceId>c12a5f95-5e0d-4d25-ac12-d0d212c9543c</TraceId>
+				</DeviceEnrollmentServiceError>
+			</s:Detail>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>
+```

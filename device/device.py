@@ -16,8 +16,7 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from roadtools.roadlib.deviceauth import DeviceAuthentication
 from roadtools.roadlib.auth import Authentication
-from utils.utils import prtauth, renew_token, token_renewal_for_enrollment, create_pfx, extract_pfx
-
+from utils.utils import prtauth, renew_token, token_renewal_for_enrollment, create_pfx, extract_pfx, get_devicetoken
 
 class Device:
     def __init__(self, logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy):
@@ -46,7 +45,7 @@ class Device:
     def entra_join(self, username, password, access_token, deviceticket):
         devicereg = 'urn:ms-drs:enterpriseregistration.windows.net'
         if access_token:
-            claims = jwt.decode(access_token, options={"verify_signature": False}, algorithms=['RS256'])
+            claims = jwt.decode(access_token, options={"verify_signature":False}, algorithms=['RS256'])
             if claims['aud'] != devicereg:
                 self.logger.info(f"wrong resource uri! {devicereg} is expected")
                 return
@@ -55,24 +54,21 @@ class Device:
             auth.resource_uri = devicereg
             auth.proxies = self.proxy
             auth.verify = False
-            self.logger.info(
-                f"performing username/password auth for '{username}' to resource '{devicereg}'"
-            )
-            access_token = auth.authenticate_username_password()['accessToken']
+            access_token = auth.authenticate_username_password()['accessToken']            
 
         certpath = f'{self.device_name}_cert.pem'
         keypath = f'{self.device_name}_key.pem'
         self.device_auth.register_device(
             access_token=access_token,
-            jointype=0,  # 0 : join, 4 : register
+            jointype=0, # 0 : join, 4 : register
             certout=certpath,
-            privout=keypath,
+            privout=keypath, 
             device_type=self.os,
             device_name=self.device_name,
             os_version=self.os_version,
             deviceticket=deviceticket
-        )
-
+            )
+        
         pfxpath = f'{self.device_name}.pfx'
         create_pfx(certpath, keypath, pfxpath)
 
@@ -81,7 +77,7 @@ class Device:
         self.logger.success(f'successfully registered {self.device_name} to Entra ID!')
         self.logger.info(f'here is your device certificate: {pfxpath} (pw: password)')
         return
-
+    
     def entra_delete(self, certpfx):
         certpath = f'device_cert.pem'
         keypath = f'device_key.pem'
@@ -89,41 +85,51 @@ class Device:
 
         self.device_auth.loadcert(pemfile=certpath, privkeyfile=keypath)
         self.device_auth.delete_device(certpath, keypath)
-
+        
         os.remove(certpath)
-        os.remove(keypath)
+        os.remove(keypath)        
         return
 
-    def enroll_intune(self):
-        access_token, refresh_token = prtauth(self.prt, self.session_key, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'https://graph.microsoft.com/', None, self.proxy, self.logger)
+    def enroll_intune(self, certpfx, refresh_token, is_device, is_hybrid):
+        if certpfx:
+            access_token, refresh_token = prtauth(self.prt, self.session_key, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'https://graph.microsoft.com/', None, self.proxy)
+        else:
+            access_token, refresh_token = renew_token(refresh_token, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'https://graph.microsoft.com/.default', self.proxy)
+
         enrollment_url = self.get_enrollment_info(access_token, self.provider_name)
-        self.logger.info(f"Resolved enrollment url: {enrollment_url}")
-
+        self.logger.info(f"resolved enrollment url: {enrollment_url}")
+        
         private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048
-        )
+            public_exponent=65537,  
+            key_size=2048           
+            )
+        
+        if is_device:
+            self.logger.info('uses device token for Intune enrollment')
+            csr_token = get_devicetoken(self.tenant, certpfx)
+        else:
+            csr_token = self.get_enrollment_token(refresh_token)
 
-        csr_token = self.get_enrollment_token(refresh_token)
         csr_der = self.create_csr(private_key, self.cname)
         csr_pem = base64.b64encode(csr_der).decode('utf-8')
         try:
-            response = self.send_enroll_request(enrollment_url, csr_pem, csr_token, None)
+            self.logger.info('enrolling device to Intune...')
+            response = self.send_enroll_request(enrollment_url, csr_pem, csr_token, None, is_device, is_hybrid)
         except:
-            self.logger.error('Device enrollment failed. Maybe enrollment restriction?')
+            self.logger.error('device enrollment failed. maybe enrollment restriction?')
             return
 
         my_cert = self.parse_enroll_response(response)
         if my_cert == None:
             self.logger.error(f'certificate signing request failed. retry later')
             return
-
+        
         pfxpath = f'{self.device_name}_mdm.pfx'
         self.save_mdm_certs(private_key, my_cert, pfxpath)
         self.logger.success(f'successfully enrolled {self.device_name} to Intune!')
         self.logger.info(f'here is your MDM pfx: {pfxpath} (pw: password)')
         return
-
+    
     @abstractmethod
     def get_enrollment_token(self, refresh_token):
         pass
@@ -135,7 +141,6 @@ class Device:
             proxies=self.proxy,
             verify=False
         )
-
         for value in response.json()['value']:
             if value['providerName'] == provider_name:
                 return value['uri']
@@ -157,9 +162,9 @@ class Device:
             for excluded_key in excluded_keys:
                 if excluded_key in locuri:
                     is_excluded = True
-
+    
             if is_excluded == False and 'Data' in cmd['Item']:
-                profiles.append({'LocURI': locuri, 'Data': cmd['Item']['Data']})
+                    profiles.append({'LocURI': locuri, 'Data':cmd['Item']['Data']})
         return profiles
 
     def extract_msi_url(self, cmds):
@@ -176,35 +181,35 @@ class Device:
                 if 'IntuneWindowsAgent.msi' not in url:
                     urls.append(url.replace('&amp;', '&'))
         return urls
-
+    
     def extract_odjblob(self, cmds):
         if 'Exec' not in cmds:
             return None
         for cmd in cmds['Exec']:
             locuri = cmd['Item']['Target']['LocURI']
-            if locuri == './Vendor/MSFT/OfflineDomainJoin/Blob':
+            if locuri == './Vendor/MSFT/OfflineDomainJoin/Blob':                    
                 return cmd['Item']['Data']
         return None
-
+    
     def print_djoinblob(self, djoin_encoded):
         djoinblob = base64.b64decode(djoin_encoded)
-
-        chars = ''
+        
+        chars=''
         for b in djoinblob:
             if b == 0:
                 continue
-            elif 32 <= b <= 126:
-                chars += chr(b)
+            elif 32<= b <= 126:
+                chars+=chr(b)
             else:
-                chars += ' '
-
+                chars+=' '
+        
         def get_str_and_next(blob, start):
-            str_size = (struct.unpack('<I', blob[start:start + 0x4])[0]) * 2
-            str = blob[start + 0xc:start + 0xc + str_size].decode('utf-16le')
+            str_size = (struct.unpack('<I', blob[start:start+0x4])[0]) * 2
+            str = blob[start+0xc:start+0xc+str_size].decode('utf-16le')
 
-            next = start + 0xc + len(str) * 2
+            next = start+0xc+len(str)*2
             if next % 4 != 0:
-                next += +2
+                next +=+2
 
             return str, next
 
@@ -220,7 +225,7 @@ class Device:
         print(f' - computerpass: {password}')
         print(f' - dc ip address: {dcip[0]}')
 
-        return
+        return    
 
     def download_msi(self, msi_url, certpath, keypath):
         parsed_url = urllib.parse.urlparse(msi_url)
@@ -230,10 +235,8 @@ class Device:
         response = requests.get(
             url=msi_url,
             cert=(certpath, keypath),
-            proxies=self.proxy,
-            verify=False,
-        )
-
+            )
+        
         if response.status_code == 200 and file_name_hash:
             filename = os.path.splitext(file_name_hash)[0]
             with open(filename, 'wb') as f:
@@ -260,7 +263,7 @@ class Device:
             syncml_data = self.send_syncml(syncml_data, certpath, keypath)
             if 'Unenroll' in syncml_data.decode():
                 self.logger.alert(f'unenrolling this device ...')
-
+            
             if 'Bad Request' in syncml_data.decode():
                 break
 
@@ -275,7 +278,7 @@ class Device:
             if odjblob is None:
                 odjblob = self.extract_odjblob(cmds)
 
-            msgid += 1
+            msgid+=1
             syncml_data = self.generate_syncml_response(msgid, sessionid, imei, cmds)
 
         self.logger.info(f'checkin ended!')
@@ -287,49 +290,44 @@ class Device:
                     print(xmltodict.parse(profile["Data"]))
                 else:
                     print(f'- {profile["LocURI"]}: {profile["Data"]}')
-
+        
         if len(msi_urls):
             self.logger.alert(f'we found line-of-business app...')
             for msi_url in msi_urls:
                 self.logger.info(f'downloading msi file from {msi_url}')
                 self.download_msi(msi_url, certpath, keypath)
 
+
         if odjblob:
             self.logger.success(f'got online domain join blob')
             self.print_djoinblob(odjblob)
-
+            
         os.remove(certpath)
         os.remove(keypath)
         return
 
     def check_compliant(self):
-        access_token, refresh_token = prtauth(self.prt, self.session_key, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'https://graph.microsoft.com/', None, self.proxy, self.logger)
-        iwservice_url = self.get_enrollment_info(access_token, 'IWService')
+        access_token, refresh_token = prtauth(self.prt, self.session_key, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'https://graph.microsoft.com/', None, self.proxy)
+        iwservice_url = self.get_enrollment_info(access_token, 'IWService')        
         self.logger.info(f"resolved IWservice url: {iwservice_url}")
         token_renewal_url = self.get_enrollment_info(access_token, 'TokenRenewalService')
-        self.logger.info(f"resolved token renewal url: {token_renewal_url}")
-        renewal_token = renew_token(
-            refresh_token,
-            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
-            'd4ebce55-015a-49b5-a083-c84d1797ae8c/.default openid offline_access profile',
-            self.proxy,
-            self.logger,
-        )
-        enrollment_token = token_renewal_for_enrollment(
-            token_renewal_url, renewal_token, self.proxy, self.logger
-        )
-
+        self.logger.info(f"resolved token renewal url: {token_renewal_url}")      
+        renewal_token, _ = renew_token(refresh_token, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'd4ebce55-015a-49b5-a083-c84d1797ae8c/.default openid offline_access profile', self.proxy)
+        enrollment_token = token_renewal_for_enrollment(token_renewal_url, renewal_token, self.proxy)        
+        
         device_name = self.get_device_info(iwservice_url, enrollment_token, 'OfficialName')
         state = self.get_device_info(iwservice_url, enrollment_token, 'ComplianceState')
-        if state == 'Compliant':
+        reasons = self.get_device_info(iwservice_url, enrollment_token, 'NoncompliantRules')
+
+        if state == 'Compliant' or len(reasons) == 0:
             self.logger.success(f'{device_name} is compliant!')
             return
 
-        self.logger.error(f'{device_name} is not compliant')
-        reasons = self.get_device_info(iwservice_url, enrollment_token, 'NoncompliantRules')
         if reasons == None:
             self.logger.info(f'maybe device is already retired or not enrolled yet')
             return
+        
+        self.logger.error(f'{device_name} is not compliant')
 
         i = 1
         for reason in reasons:
@@ -339,105 +337,42 @@ class Device:
             if "ExpectedValue" in reason:
                 print(f' - ExpectedValue: {reason["ExpectedValue"]}')
             print(f' - Description: {reason["Description"]}')
-            i = i + 1
-
-        return
-
-    def list_policies(self):
-        access_token, _ = prtauth(
-            self.prt,
-            self.session_key,
-            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
-            'https://graph.microsoft.com/',
-            None,
-            self.proxy,
-            self.logger,
-        )
-
-        endpoints = [
-            'deviceManagement/deviceCompliancePolicies',
-            'deviceManagement/deviceConfigurations'
-        ]
-
-        for endpoint in endpoints:
-            url = f'https://graph.microsoft.com/v1.0/{endpoint}'
-            response = requests.get(url, headers={'Authorization': f'Bearer {access_token}'}, proxies=self.proxy, verify=False)
-            if response.status_code != 200:
-                self.logger.error(f'failed to retrieve {endpoint}')
-                continue
-            items = response.json().get('value', [])
-            if len(items) == 0:
-                self.logger.info(f'no entries found for {endpoint}')
-                continue
-            self.logger.alert(f'{endpoint} :')
-            for item in items:
-                name = item.get('displayName') or item.get('name')
-                pid = item.get('id')
-                print(f' - {name} ({pid})')
-
-        return
-
-    def list_device_groups(self):
-        access_token, _ = prtauth(
-            self.prt,
-            self.session_key,
-            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
-            'https://graph.microsoft.com/',
-            None,
-            self.proxy,
-            self.logger,
-        )
-
-        url = 'https://graph.microsoft.com/v1.0/groups?$select=id,displayName,groupTypes'
-        response = requests.get(url, headers={'Authorization': f'Bearer {access_token}'}, proxies=self.proxy, verify=False)
-        if response.status_code != 200:
-            self.logger.error('failed to retrieve groups')
-            return
-
-        groups = response.json().get('value', [])
-        if len(groups) == 0:
-            self.logger.info('no groups found')
-            return
-        self.logger.alert('device groups:')
-        for grp in groups:
-            print(f" - {grp.get('displayName')} ({grp.get('id')}) {grp.get('groupTypes')}")
+            i = i+1
 
         return
 
     def retire_intune(self):
-        access_token, refresh_token = prtauth(self.prt, self.session_key, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'https://graph.microsoft.com/', None, self.proxy, self.logger)
+        access_token, refresh_token = prtauth(self.prt, self.session_key, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'https://graph.microsoft.com/', None, self.proxy)
         iwservice_url = self.get_enrollment_info(access_token, 'IWService')
         self.logger.info(f"resolved IWservice url: {iwservice_url}")
         token_renewal_url = self.get_enrollment_info(access_token, 'TokenRenewalService')
         self.logger.info(f"resolved token renewal url: {token_renewal_url}")
-
-        renewal_token = renew_token(
-            refresh_token,
-            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
-            'd4ebce55-015a-49b5-a083-c84d1797ae8c/.default openid offline_access profile',
-            self.proxy,
-            self.logger,
-        )
-        enrollment_token = token_renewal_for_enrollment(
-            token_renewal_url, renewal_token, self.proxy, self.logger
-        )
+        
+        renewal_token, _ = renew_token(refresh_token, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'd4ebce55-015a-49b5-a083-c84d1797ae8c/.default openid offline_access profile', self.proxy)
+        enrollment_token = token_renewal_for_enrollment(token_renewal_url, renewal_token, self.proxy)
 
         retire_info = self.get_device_info(iwservice_url, enrollment_token, '#CommonContainer.Retire')
         if retire_info == None:
             retire_info = self.get_device_info(iwservice_url, enrollment_token, '#CommonContainer.FullWipe')
+        
+        enrollment_type = self.get_device_info(iwservice_url, enrollment_token, 'EnrollmentType')
+        if enrollment_type == 18:
+            self.logger.error(f'this device seems to be a corporate device. Ask IT admins to delete this device')
+            return
 
         if retire_info == None:
             self.logger.info(f'maybe this device is not enrolled or already retired')
-            return
-
+            return 
+        
+        
         retire_url = retire_info['target']
-        self.logger.info(f"resolved retirement url: {retire_url}")
+        self.logger.info(f"resolved reitrement url: {retire_url}")
 
         result = self.send_retire_request(retire_url, enrollment_token)
         if result == True:
             self.logger.success(f"successfully retired: {self.deviceid}")
         else:
-            self.logger.error(f'failed to retire the device')
+            self.logger.error(f'failed to retire the device')        
         return
 
     def send_retire_request(self, retire_url, access_token):
@@ -446,24 +381,24 @@ class Device:
             headers={"Authorization": f"Bearer {access_token}"},
             proxies=self.proxy,
             verify=False
-        )
+            )
 
         if response.status_code == 204:
             return True
         return False
-
+    
     def get_device_info(self, iwservice_url, access_token, key):
         response = requests.get(
             url=f"{iwservice_url}/Devices?api-version=16.4&ssp={self.os}SSP&ssp-version={self.ssp_version}&os={self.os}&os-version={self.os_version}&os-sub=None&arch=ARM&mgmt-agent=Mdm",
             headers={"Authorization": f"Bearer {access_token}"},
             proxies=self.proxy,
             verify=False
-        )
+            )
 
         for value in response.json()['value']:
             if value['AadId'] == self.deviceid:
                 if key in value:
-                    return value[key]
+                    return value[key]                
         return None
 
     @abstractmethod
@@ -492,9 +427,9 @@ class Device:
         parsed_dict = xmltodict.parse(xml_data)
         syncml_data = parsed_dict['SyncML']
         sync_body = syncml_data['SyncBody']
-        results = {'Get': [], 'Atomic': [], 'Add': [], 'Replace': [], 'Exec': [], 'Sequence': [], 'Delete': []}
+        results = {'Get':[], 'Atomic':[], 'Add':[], 'Replace':[], 'Exec':[], 'Sequence':[], 'Delete':[]}
         results = self.parse_omadm_cmd(sync_body, results)
-
+        
         cmdlen = 0
         for omadm_cmd in results.keys():
             cmdlen += len(results[omadm_cmd])
@@ -519,8 +454,8 @@ class Device:
                     "Source": {"LocURI": f"imei:{imei}"}
                 },
                 "SyncBody": {}
+                }
             }
-        }
         return syncml_template
 
     def generate_initial_syncml(self, sessionid, imei):
@@ -547,9 +482,9 @@ class Device:
                     "Data": "200",
                 }
             ],
-            "Results": [],
+            "Results":[],
             "Final": None,
-        }
+            }
 
         cmdid = 8
         for cmd_type in cmds:
@@ -559,27 +494,27 @@ class Device:
                     "MsgRef": str(msgref),
                     "CmdRef": cmd["CmdID"],
                     "Cmd": cmd_type,
-                    "Data": "200"
+                    "Data": "200"            
                 }
                 if cmd_type == 'Get':
-                    locuri = cmd["Item"]["Target"]["LocURI"]
+                    locuri = cmd["Item"]["Target"]["LocURI"]                    
                     data = self.get_syncml_data(locuri)
                     if data:
                         print(f' [*] sending data for {locuri}')
                         result = {
-                            "CmdID": str(cmdid + 1),
+                            "CmdID": str(cmdid+1),
                             "MsgRef": str(msgref),
                             "CmdRef": cmd["CmdID"],
                             "Item": {
                                 "Source": {
                                     "LocURI": locuri
-                                },
+                                    },
                                 "Meta": {
                                     "Format": {"@xmlns": "syncml:metinf", "#text": data["Format"]}
                                 },
                                 "Data": data["Data"],
-                            }
-                        }
+                                }
+                            }                    
                         syncml_data["SyncML"]["SyncBody"]["Results"].append(result)
                     else:
                         status["Data"] = "404"
@@ -589,18 +524,19 @@ class Device:
                     cmdid += 1
                 syncml_data["SyncML"]["SyncBody"]["Status"].append(status)
 
+
         return xmltodict.unparse(syncml_data, pretty=False)
 
     def send_syncml(self, data, certpath, keypath):
         response = requests.post(
             url=self.checkin_url,
             data=data,
-            headers={'User-Agent': f'MSFT {self.os} OMA DM Client/2.7', 'Content-Type': 'application/vnd.syncml.dm+xml'},
+            headers={'User-Agent': f'MSFT {self.os} OMA DM Client/2.7' , 'Content-Type': 'application/vnd.syncml.dm+xml'},
             verify=False,
             cert=(certpath, keypath)
-        )
+            )
         return response.content
-
+        
     def create_csr(self, private_key, cname):
         csr_subject = x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, cname)
@@ -625,7 +561,7 @@ class Device:
             cert,
             None,
             serialization.BestAvailableEncryption(b"password")
-        )
+            )
 
         with open(pfxpath, 'wb') as outfile:
             outfile.write(pfx)

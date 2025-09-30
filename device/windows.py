@@ -11,7 +11,7 @@ import xmltodict
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from device.device import Device
-from utils.utils import prtauth, extract_pfx, save_encrypted_message_as_smime, decrypt_smime_file, aes_decrypt
+from utils.utils import prtauth, extract_pfx, save_encrypted_message_as_smime, decrypt_smime_file, aes_decrypt, renew_token
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import Encoding
@@ -27,14 +27,26 @@ class Windows(Device):
         self.cname = 'ConfigMgrEnroll'
     
     def get_enrollment_token(self, refresh_token):
-        access_token, refresh_token = prtauth(
-            self.prt, self.session_key, '29d9ed98-a469-4536-ade2-f981bc1d605e', 'https://enrollment.manage.microsoft.com/', 'ms-aadj-redir://auth/mdm', self.proxy, self.logger
-            )
+        if self.prt:
+            access_token, _ = prtauth(
+                self.prt, self.session_key, '29d9ed98-a469-4536-ade2-f981bc1d605e', 'https://enrollment.manage.microsoft.com/', 'ms-aadj-redir://auth/mdm', self.proxy
+                )
+        else:
+            access_token, _ = renew_token(refresh_token, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'openid offline_access profile d4ebce55-015a-49b5-a083-c84d1797ae8c/.default', self.proxy)
         return access_token
+    
+    def replace_string(self, flag, keyword, str, replace_str):  
+        if flag:
+            str = str.replace(keyword, replace_str)
+        else:
+            str = str.replace(keyword, '')
+        return str
 
-    def send_enroll_request(self, enrollment_url, csr_pem, csr_token, ztdregistrationid):
-        claims = jwt.decode(csr_token, options={"verify_signature":False}, algorithms=['RS256'])
-        hwdevid = f"{self.deviceid}{claims['tid']}".replace('-', '')
+    def send_enroll_request(self, enrollment_url, csr_pem, csr_token, ztdregistrationid,  is_device, is_hejd):
+        deviceid = None
+        if self.deviceid:
+            deviceid = self.deviceid.replace('-', '')
+            
         token_b64 = base64.b64encode(csr_token.encode('utf-8')).decode('utf-8')
         message_id = str(uuid.uuid4())
         body = f'''
@@ -59,12 +71,17 @@ class Windows(Device):
                     <ac:ContextItem Name="UXInitiated">
                         <ac:Value>true</ac:Value>
                     </ac:ContextItem>
+                    REPLACE_HEJD
                     <ac:ContextItem Name="HWDevID">
-                        <ac:Value>{hwdevid}</ac:Value>
+                        <ac:Value>0000000000000000000000000000000000000000000000000000000000000000</ac:Value>
+                    </ac:ContextItem>
+                    <ac:ContextItem Name="AzVMIAMExtensionJoin">
+                        <ac:Value>{is_device}</ac:Value>
                     </ac:ContextItem>
                     <ac:ContextItem Name="BootstrapDomainJoin">
                         <ac:Value>true</ac:Value>
                     </ac:ContextItem>
+                    REPLACE_MDM_ONLY_ENROLL
                     <ac:ContextItem Name="NotInOobe">
                         <ac:Value>false</ac:Value>
                     </ac:ContextItem>
@@ -88,7 +105,7 @@ class Windows(Device):
                         <ac:Value>00-00-00-00-00-00</ac:Value>
                     </ac:ContextItem>     
                     <ac:ContextItem Name="DeviceID">
-                        <ac:Value>{self.deviceid.replace('-', '')}</ac:Value>
+                        <ac:Value>{deviceid}</ac:Value>
                     </ac:ContextItem>
                     <ac:ContextItem Name="EnrollmentType">
                         <ac:Value>Device</ac:Value>
@@ -107,17 +124,25 @@ class Windows(Device):
         </s:Body>
     </s:Envelope>
     '''
-        
-        if ztdregistrationid:
-            replace_str = f'''
-                    <ac:ContextItem Name="ZeroTouchProvisioning">
-                        <ac:Value>{ztdregistrationid}</ac:Value>
-                    </ac:ContextItem>
-                    '''
-            body = body.replace('REPLACE_ZEROTOUCH_PROVISIONING', replace_str)
-        else:
-            body = body.replace('REPLACE_ZEROTOUCH_PROVISIONING', '')
+        replace_str = f'''
+            <ac:ContextItem Name="OfflineAutoPilotEnrollmentCorrelator">
+                <ac:Value>12345678-1E13-45F3-BF82-A3E8C5B59EAC</ac:Value>
+            </ac:ContextItem>
+            '''
+        body = self.replace_string((not self.deviceid), 'REPLACE_MDM_ONLY_ENROLL', body, replace_str)
 
+        replace_str = f'''
+            <ac:ContextItem Name="ZeroTouchProvisioning">
+                <ac:Value>{ztdregistrationid}</ac:Value>
+            </ac:ContextItem>
+            '''        
+        body = self.replace_string(ztdregistrationid, 'REPLACE_ZEROTOUCH_PROVISIONING', body, replace_str)        
+        replace_str = f'''
+            <ac:ContextItem Name="DomainName">
+                <ac:Value>evil.local</ac:Value>
+            </ac:ContextItem>
+            '''
+        body = self.replace_string(is_hejd, 'REPLACE_HEJD', body, replace_str)
         response = requests.post(
             url=enrollment_url,
             data=body,
@@ -125,10 +150,8 @@ class Windows(Device):
             proxies=self.proxy,
             verify=False
         )
-
-        if response.status_code != 200:
-            self.logger.error(f'Error in Intune enrollment: {response.status_code}')
-            self.logger.error(f'The following content was returned: \n{response.content}')
+        print(f"{response.status_code=} {response.content=}")
+        self.logger.debug(f'received response for enrollment request:\n{response.content.decode()}')
         xml = ET.fromstring(response.content.decode('utf-8'))
         binary_security_token = xml.find('.//{http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd}BinarySecurityToken').text
         return base64.b64decode(binary_security_token).decode('utf-8')
@@ -401,7 +424,6 @@ class Windows(Device):
         os.remove(certpath)
         os.remove(keypath)
 
-
     def download_remediation_scripts(self, mdmpfx):
         certpath = 'pytune_mdm.crt'
         keypath = 'pytune_mdm.key'
@@ -428,7 +450,6 @@ class Windows(Device):
 
         os.remove(certpath)
         os.remove(keypath)
-
 
 class IME():
     def __init__(self, device_name, certpath, keypath):
@@ -479,8 +500,6 @@ class IME():
         response = requests.get(
             url='https://manage.microsoft.com/RestUserAuthLocationService/RestUserAuthLocationService/Certificate/ServiceAddresses',
             cert=(self.certpath, self.keypath),
-            verify=False,
-            proxies=self.proxy,
             )
         
         services = response.json()[0]["Services"]
@@ -527,14 +546,12 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
-            verify=False,
-            proxies=self.proxy,
             )
         
         response_payload = response.json()['ResponsePayload']
         decompressed_string = self.decompress_string(response_payload)
         return json.loads(decompressed_string)
-
+    
     def get_remediation_scripts(self):
 
         sidecar_url = self.resolve_service_address()
@@ -551,8 +568,6 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
-            verify=False,
-            proxies=self.proxy,
             )
         
         response_payload = response.json()['ResponsePayload']
@@ -598,39 +613,25 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
-            verify=False,
-            proxies=self.proxy,
-            )
+            )    
 
         response_payload = response.json()["ResponsePayload"]
         return json.loads(response_payload)
 
     def download_decrypt_intunewin(self, appname, upload_location, key, iv):
         response = requests.get(
-            url=upload_location,
-            verify=False,
-            proxies=self.proxy,
+            url=upload_location
         )
 
         decrypted_data = aes_decrypt(key, iv, response.content[48:])
-        intunewin_path = f'{appname}.intunewin'
-        with open(intunewin_path, 'wb') as f:
-            f.write(decrypted_data)
-
-        try:
-            import zipfile
-            extract_dir = f'{appname}_extracted'
-            with zipfile.ZipFile(intunewin_path, 'r') as zf:
-                zf.extractall(extract_dir)
-            self.logger.success(f'extracted to {extract_dir}')
-        except Exception as e:
-            self.logger.error(f'failed to extract {intunewin_path}: {e}')
+        with open(f'{appname}.intunewin', 'wb') as f:
+            f.write(decrypted_data)        
 
     def request_policy(self):
         sidecar_url = self.resolve_service_address()
-        if sidecar_url is None:
-            self.logger.error('SideCarGatewayService not found')
-            return []
+        if sidecar_url == None:
+            self.logger.error(f'SidecCarGatewayService not found')
+            return
 
         sessionid = str(uuid.uuid4())
         data = self.create_request_data(sessionid, "PolicyRequest")
@@ -644,8 +645,6 @@ class IME():
             cert=(self.certpath, self.keypath),
             data=json.dumps(data),
             headers=headers,
-            verify=False,
-            proxies=self.proxy,
-            )
+            )    
         response_payload = response.json()["ResponsePayload"]
         return json.loads(response_payload)

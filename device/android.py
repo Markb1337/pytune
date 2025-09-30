@@ -9,7 +9,7 @@ from utils.utils import renew_token
 class Android(Device):
     def __init__(self, logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy):
         super().__init__(logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy)
-        self.os_version = '8.2.0'
+        self.os_version = '16.0'
         self.ssp_version = '5.0.6060.0'
         self.checkin_url = 'https://a.manage.microsoft.com/devicegatewayproxy/AndroidHandler.ashx?Platform=AndroidForWork'
         self.provider_name = 'AndroidEnrollment'
@@ -48,15 +48,10 @@ class Android(Device):
         return xmltodict.unparse(syncml_data, pretty=False)
 
     def get_enrollment_token(self, refresh_token):
-        return renew_token(
-            refresh_token,
-            '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223',
-            'openid offline_access profile d4ebce55-015a-49b5-a083-c84d1797ae8c/.default',
-            self.proxy,
-            self.logger,
-        )
+        access_token, _ = renew_token(refresh_token, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'openid offline_access profile d4ebce55-015a-49b5-a083-c84d1797ae8c/.default', self.proxy)
+        return access_token
 
-    def send_enroll_request(self, enrollment_url, csr_pem, csr_token, ztdregistrationid):
+    def send_enroll_request(self, enrollment_url, csr_pem, csr_token, ztdregistrationid,  is_avd, is_hejd):
         token_b64 = base64.b64encode(csr_token.encode('utf-8')).decode('utf-8')
         body = f'''
     <s:Envelope
@@ -119,7 +114,8 @@ class Android(Device):
             proxies=self.proxy,
             verify=False
         )
-
+        print(f"{response.status_code=} {response.content=}")
+        self.logger.debug(f'received response for enrollment request:\n{response.content.decode()}')
         xml = ET.fromstring(response.content.decode('utf-8'))
         binary_security_token = xml.find('.//{http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd}BinarySecurityToken').text
         return base64.b64decode(binary_security_token).decode('utf-8')
@@ -351,6 +347,10 @@ class Android(Device):
             f"./Device/Vendor/MSFT/WorkplaceJoin/AADID": {
                 "Format": "chr",
                 "Data": self.deviceid
+            },
+            f"./User/{self.uid}/Vendor/MSFT/Scheduler/intervalDurationSeconds": {
+                "Format": "int",
+                "Data": "28800"
             },
             f"./Device/Vendor/MSFT/DeviceLock/DevicePolicyManager/IsActivePasswordSufficient": {
                 "Format": "bool",
